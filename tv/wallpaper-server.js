@@ -201,82 +201,106 @@ function addRecentApp(id) {
   try { fs.writeFileSync(path.join(DATA, 'recents.json'), JSON.stringify(list)); } catch (e) {}
 }
 
-function getRecentsData(cb) {
-  getRunningApps(function (runningList) {
-    var dict = getAppDict();
-    var recentsHistory = getRecentsHistory();
-    var runningMap = {};
-    var IGNORE = {
-      'com.gathin.tvhome': true,
-      'com.webos.app.home': true,
-      'com.webos.app.screensaver': true,
-      'airplay': true
-    };
+function isSystemOrInput(id) {
+  if (!id) return true;
+  if (id === 'com.gathin.tvhome' || id === 'com.webos.app.home' || id === 'com.webos.app.screensaver' || id === 'airplay') return true;
+  if (id === 'com.webos.app.livetv') return true;
+  if (id.indexOf('com.webos.app.hdmi') === 0) return true;
+  if (id.indexOf('com.webos.app.externalinput') === 0) return true;
+  if (id.indexOf('com.webos.app.tvhotkey') === 0) return true;
+  if (id.indexOf('com.webos.service.') === 0) return true;
+  return false;
+}
 
-    runningList.forEach(function (r) {
-      if (!IGNORE[r.id]) {
-        runningMap[r.id] = r;
-      }
-    });
-
-    var result = [];
-    var seen = {};
-    var order = [];
-
-    recentsHistory.forEach(function (id) {
-      if (runningMap[id]) {
-        order.push(id);
-        seen[id] = true;
-      }
-    });
-    for (var rId in runningMap) {
-      if (!seen[rId]) {
-        order.push(rId);
-        seen[rId] = true;
-      }
+function getOfficialRecents(cb) {
+  execFile('luna-send', ['-n', '1', 'luna://com.webos.service.recent/listRecents', '{}'], { timeout: 3000 }, function (err, out) {
+    var list = [];
+    if (!err && out) {
+      try {
+        var j = JSON.parse(out.trim().split('\n').pop());
+        (j.recentsAppList || []).forEach(function (it) {
+          if (it.appId && !isSystemOrInput(it.appId)) {
+            list.push(it.appId);
+          }
+        });
+      } catch (e) {}
     }
+    cb(list);
+  });
+}
 
-    recentsHistory.forEach(function (id) {
-      if (!seen[id] && !IGNORE[id]) {
-        order.push(id);
-        seen[id] = true;
-      }
-    });
+function getRecentsData(cb) {
+  getOfficialRecents(function (officialRecents) {
+    getRunningApps(function (runningList) {
+      var dict = getAppDict();
+      var recentsHistory = getRecentsHistory();
+      var runningMap = {};
 
-    order.forEach(function (id) {
-      var app = dict[id] || { id: id, title: id, icon: '' };
-      var isRunning = !!runningMap[id];
-      result.push({
-        id: id,
-        title: app.title || id,
-        icon: app.icon || '',
-        iconColor: app.iconColor || '',
-        running: isRunning,
-        processId: isRunning ? runningMap[id].processid : ''
+      runningList.forEach(function (r) {
+        if (!isSystemOrInput(r.id)) {
+          runningMap[r.id] = r;
+        }
       });
-    });
 
-    cb(result);
+      var result = [];
+      var seen = {};
+      var order = [];
+
+      // 1. Add official webOS recents (apps actually launched by user)
+      officialRecents.forEach(function (id) {
+        if (!seen[id] && !isSystemOrInput(id)) {
+          order.push(id);
+          seen[id] = true;
+        }
+      });
+
+      // 2. Add session recents recorded by homewatch
+      recentsHistory.forEach(function (id) {
+        if (!seen[id] && !isSystemOrInput(id)) {
+          order.push(id);
+          seen[id] = true;
+        }
+      });
+
+      // 3. Actively running user apps that match recents
+      for (var rId in runningMap) {
+        if (!seen[rId] && !isSystemOrInput(rId)) {
+          order.push(rId);
+          seen[rId] = true;
+        }
+      }
+
+      order.forEach(function (id) {
+        var app = dict[id] || { id: id, title: id, icon: '' };
+        var isRunning = !!runningMap[id];
+        result.push({
+          id: id,
+          title: app.title || id,
+          icon: app.icon || '',
+          iconColor: app.iconColor || '',
+          running: isRunning,
+          processId: isRunning ? runningMap[id].processid : ''
+        });
+      });
+
+      cb(result);
+    });
   });
 }
 
 function closeAppById(appId, cb) {
   runningCache = null;
-  getRunningApps(function (runningList) {
-    var pids = [];
-    runningList.forEach(function (r) {
-      if (r.id === appId && r.processid) {
-        pids.push(r.processid);
-      }
-    });
-
-    if (pids.length > 0) {
-      pids.forEach(function (pid) {
-        try { process.kill(parseInt(pid, 10), 'SIGTERM'); } catch (e) {}
+  // 1. Remove from official webOS recents
+  execFile('luna-send', ['-n', '1', 'luna://com.webos.service.recent/removeRecent', JSON.stringify({ appId: appId })], function () {
+    // 2. Terminate running process if any
+    getRunningApps(function (runningList) {
+      runningList.forEach(function (r) {
+        if (r.id === appId && r.processid) {
+          try { process.kill(parseInt(r.processid, 10), 'SIGTERM'); } catch (e) {}
+          try { process.kill(parseInt(r.processid, 10), 'SIGKILL'); } catch (e) {}
+        }
       });
-    }
-
-    execFile('luna-send', ['-n', '1', 'luna://com.webos.applicationManager/closeByAppId', JSON.stringify({ id: appId })], function () {
+      // 3. Remove from session history
       var recents = getRecentsHistory();
       recents = recents.filter(function (x) { return x !== appId; });
       recentsMemory = recents;
@@ -289,23 +313,16 @@ function closeAppById(appId, cb) {
 
 function closeAllUserApps(cb) {
   runningCache = null;
-  getRunningApps(function (runningList) {
-    var IGNORE = {
-      'com.gathin.tvhome': true,
-      'com.webos.app.home': true,
-      'com.webos.app.screensaver': true,
-      'com.webos.app.livetv': true,
-      'airplay': true
-    };
-    runningList.forEach(function (r) {
-      if (!IGNORE[r.id] && r.processid) {
-        try { process.kill(parseInt(r.processid, 10), 'SIGTERM'); } catch (e) {}
-      }
+  // 1. Call official webOS closeAllApps to terminate all background renderers cleanly
+  execFile('luna-send', ['-n', '1', 'luna://com.webos.applicationManager/closeAllApps', '{}'], function () {
+    // 2. Call official webOS removeAllRecents to clear the recent app history
+    execFile('luna-send', ['-n', '1', 'luna://com.webos.service.recent/removeAllRecents', '{}'], function () {
+      // 3. Clear our local memory & file
+      recentsMemory = [];
+      try { fs.writeFileSync(path.join(DATA, 'recents.json'), JSON.stringify([])); } catch (e) {}
+      runningCache = null;
+      cb({ ok: true });
     });
-    recentsMemory = [];
-    try { fs.writeFileSync(path.join(DATA, 'recents.json'), JSON.stringify([])); } catch (e) {}
-    runningCache = null;
-    cb({ ok: true });
   });
 }
 

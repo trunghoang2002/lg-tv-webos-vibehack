@@ -426,11 +426,14 @@
     items[i].el.classList.add('focused');
 
     var top = tileTop(i), row = rowOf(i);
+    var maxRow = rowOf(items.length - 1);
     if (row === 0) {
       offset = 0;
     } else {
-      // Scroll just enough so the whole glass and the name below the tile are visible.
-      if (top - offset + TILE_H + 70 > VIEW_BOTTOM) offset = top + TILE_H + 70 - VIEW_BOTTOM;
+      // Scroll so the current tile is visible, and if there's a row below, make it peek in by 90px
+      // so it's clearly visible and hoverable by the pointer!
+      var peek = (row < maxRow) ? 90 : 0;
+      if (top - offset + TILE_H + 70 + peek > VIEW_BOTTOM) offset = top + TILE_H + 70 + peek - VIEW_BOTTOM;
       if (top - offset - 24 < VIEW_TOP) offset = top - 24 - VIEW_TOP;
     }
     stage.style.transform = 'translate3d(0,' + (-offset) + 'px,0)';
@@ -1169,6 +1172,63 @@
   pills.forEach(function (p, i) {
     p.addEventListener('mouseover', function () { if (zone !== 'inputs' && zone !== 'wall' && zone !== 'cols') focusPill(i); });
     p.addEventListener('click', function () { activatePill(i); });
+  });
+
+  // Rolling the Magic Remote scroll wheel scrolls the app grid by row smoothly
+  window.addEventListener('wheel', function (e) {
+    if (editing || arranging || zone === 'inputs' || zone === 'wall' || zone === 'cols') return;
+    if (zone === 'recents') {
+      var rw = $('recentsScrollWrap');
+      if (rw) rw.scrollLeft += (e.deltaY || e.detail || 0);
+      return;
+    }
+    var dir = (e.deltaY || e.detail || 0) > 0 ? 1 : -1;
+    var curRow = rowOf(focused);
+    var targetRow = curRow + dir;
+    var maxRow = rowOf(items.length - 1);
+    if (targetRow < 0) {
+      if (zone === 'grid') focusPill(pillAbove(focused));
+    } else if (targetRow <= maxRow) {
+      var col = focused % COLUMNS;
+      var targetIdx = Math.min(items.length - 1, targetRow * COLUMNS + col);
+      focusTile(targetIdx);
+    }
+  }, { passive: true });
+
+  // Edge scrolling: when the Magic Remote pointer moves near the bottom or top of the screen
+  var edgeScrollTimer = null;
+  document.addEventListener('mousemove', function (e) {
+    if (editing || arranging || zone !== 'grid') return;
+    var y = e.clientY;
+    var maxRow = rowOf(items.length - 1);
+    var curRow = rowOf(focused);
+
+    // If pointer is near the bottom edge (y >= 1000) and more rows exist below:
+    if (y >= 1000 && curRow < maxRow) {
+      if (!edgeScrollTimer) {
+        edgeScrollTimer = setTimeout(function () {
+          edgeScrollTimer = null;
+          var targetRow = curRow + 1;
+          var col = focused % COLUMNS;
+          focusTile(Math.min(items.length - 1, targetRow * COLUMNS + col));
+        }, 120);
+      }
+    } else if (y <= 120 && curRow > 0) {
+      // If pointer is near the top and we're scrolled down:
+      if (!edgeScrollTimer) {
+        edgeScrollTimer = setTimeout(function () {
+          edgeScrollTimer = null;
+          var targetRow = curRow - 1;
+          var col = focused % COLUMNS;
+          focusTile(Math.max(0, targetRow * COLUMNS + col));
+        }, 120);
+      }
+    } else {
+      if (edgeScrollTimer) {
+        clearTimeout(edgeScrollTimer);
+        edgeScrollTimer = null;
+      }
+    }
   });
 
   // ---- lifecycle -----------------------------------------------------------------------------

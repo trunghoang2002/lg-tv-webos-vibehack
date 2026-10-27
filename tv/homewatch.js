@@ -25,7 +25,8 @@ var hits = [];
 var readyAt = 0;
 
 function recordApp(id) {
-  if (!id || id === LAUNCHER || HOME_IDS.indexOf(id) !== -1 || id === 'com.webos.app.screensaver') return;
+  if (!id || id === LAUNCHER || HOME_IDS.indexOf(id) !== -1 || id === 'com.webos.app.screensaver' || id === 'airplay') return;
+  if (id === 'com.webos.app.livetv' || id.indexOf('com.webos.app.hdmi') === 0 || id.indexOf('com.webos.app.externalinput') === 0 || id.indexOf('com.webos.service.') === 0) return;
   wpServer.addRecentApp(id);
 }
 
