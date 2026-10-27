@@ -7,5 +7,4 @@ DIR=/home/root/lg-tv-vibehack
 LOG=/tmp/lg-tv-vibehack.log
 echo "$(date) boot" >> "$LOG"
 nohup setsid /usr/bin/node $DIR/homewatch.js >> "$LOG" 2>&1 < /dev/null &
-nohup setsid /usr/bin/node $DIR/wallpaper-server.js >> "$LOG" 2>&1 < /dev/null &
 nohup setsid sh -c "sleep 15; exec /usr/bin/node $DIR/sync.js" >> "$LOG" 2>&1 < /dev/null &

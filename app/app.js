@@ -190,6 +190,17 @@
   function tileLeft(i) { return 112 + (i % COLUMNS) * CELL_W + (CELL_W - TILE_W) / 2; }
   function tileTop(i) { var r = rowOf(i); return DOCK_TOP + r * ROW_PITCH + (r > 0 ? DOCK_GAP : 0); }
 
+  var hoverTimer = null;
+  function onTileHover(idx) {
+    if (editing || zone === 'inputs' || zone === 'wall' || zone === 'cols') return;
+    if (focused === idx) return;
+    if (hoverTimer) clearTimeout(hoverTimer);
+    hoverTimer = setTimeout(function () {
+      hoverTimer = null;
+      focusTile(idx);
+    }, 30);
+  }
+
   function build() {
     tilesEl.innerHTML = '';
     items = orderedApps().map(function (app) {
@@ -198,6 +209,7 @@
       var card = document.createElement('div');
       card.className = 'card';
       var img = document.createElement('img');
+      img.decoding = 'async';
       var item = { app: app, el: el, card: card, color: null };
       img.onload = function () { paintTile(item, img); };
       img.src = app.icon;
@@ -209,7 +221,7 @@
       el.appendChild(name);
       el.addEventListener('mouseover', function () {
         if (editing) { if (item !== editing.item) moveTo(items.indexOf(item)); }   // pointer drags the tile
-        else if (zone !== 'inputs' && zone !== 'wall' && zone !== 'cols') focusTile(items.indexOf(item));
+        else if (zone !== 'inputs' && zone !== 'wall' && zone !== 'cols') onTileHover(items.indexOf(item));
       });
       // With the Magic Remote pointer, holding OK sends mousedown ... mouseup + click (no OK key),
       // so a long press is timed here too, and the click that ends it is ignored.
@@ -284,15 +296,24 @@
    * Store icons are square logos on a solid colour: fill the wide tile with that colour so the logo
    * reads as a banner. LG's system icons are glyphs on transparent: use the app's own colour.
    */
+  var scratchCanvas = null, scratchCtx = null;
+  function getScratch(w, h) {
+    if (!scratchCanvas) {
+      scratchCanvas = document.createElement('canvas');
+      scratchCtx = scratchCanvas.getContext('2d', { willReadFrequently: true });
+    }
+    scratchCanvas.width = w;
+    scratchCanvas.height = h;
+    return scratchCtx;
+  }
+
   function paintTile(item, img) {
     var px = null, edge = null;
     try {
-      var c = document.createElement('canvas');
-      c.width = 12; c.height = 12;
-      var g = c.getContext('2d');
+      edge = edgeColor(img);
+      var g = getScratch(12, 12);
       g.drawImage(img, 0, 0, 12, 12);
       px = g.getImageData(0, 0, 12, 12).data;
-      edge = edgeColor(img);
     } catch (e) { /* tainted canvas: fall back to the app's colour */ }
 
     var glyphColor = null;
@@ -309,17 +330,16 @@
   }
 
   /**
-   * The icon's background at full size: a corner pixel, or the middle of the left edge for rounded
-   * icons whose corners are transparent. A downscaled sample would blend in the logo.
+   * The icon's background sampled efficiently using a tiny 1x1 scratch canvas with willReadFrequently.
    */
   function edgeColor(img) {
-    var w = img.naturalWidth, h = img.naturalHeight;
-    var c = document.createElement('canvas');
-    c.width = w; c.height = h;
-    var g = c.getContext('2d');
-    g.drawImage(img, 0, 0);
-    var corner = g.getImageData(2, 2, 1, 1).data;
-    return corner[3] > 200 ? corner : g.getImageData(2, Math.floor(h / 2), 1, 1).data;
+    var g = getScratch(1, 1);
+    g.drawImage(img, -2, -2);
+    var corner = g.getImageData(0, 0, 1, 1).data;
+    if (corner[3] > 200) return corner;
+    var h = img.naturalHeight || 32;
+    g.drawImage(img, -2, -Math.floor(h / 2));
+    return g.getImageData(0, 0, 1, 1).data;
   }
 
   function glyphBackground(hex) {
@@ -867,6 +887,7 @@
 
       if (app.icon) {
         var img = document.createElement('img');
+        img.decoding = 'async';
         img.className = 'recentIcon';
         img.src = app.icon;
         img.onerror = function () {

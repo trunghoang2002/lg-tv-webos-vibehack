@@ -14,6 +14,7 @@ var spawn = require('child_process').spawn;
 var execFile = require('child_process').execFile;
 var fs = require('fs');
 var path = require('path');
+var wpServer = require('./wallpaper-server.js');
 
 var LAUNCHER = 'com.gathin.tvhome';
 var HOME_IDS = ['com.webos.app.home'];
@@ -25,13 +26,7 @@ var readyAt = 0;
 
 function recordApp(id) {
   if (!id || id === LAUNCHER || HOME_IDS.indexOf(id) !== -1 || id === 'com.webos.app.screensaver') return;
-  var file = '/home/root/lg-tv-vibehack/recents.json';
-  var list = [];
-  try { list = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) {}
-  list = list.filter(function (x) { return x !== id; });
-  list.unshift(id);
-  if (list.length > 20) list = list.slice(0, 20);
-  try { fs.writeFileSync(file, JSON.stringify(list)); } catch (e) {}
+  wpServer.addRecentApp(id);
 }
 
 function log(msg) { console.log(new Date().toISOString() + ' ' + msg); }

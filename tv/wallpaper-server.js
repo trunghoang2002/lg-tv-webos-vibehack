@@ -183,10 +183,28 @@ function getRunningApps(cb) {
   });
 }
 
+var recentsMemory = null;
+
+function getRecentsHistory() {
+  if (!recentsMemory) {
+    recentsMemory = readJSON(path.join(DATA, 'recents.json'), []);
+  }
+  return recentsMemory;
+}
+
+function addRecentApp(id) {
+  var list = getRecentsHistory();
+  list = list.filter(function (x) { return x !== id; });
+  list.unshift(id);
+  if (list.length > 20) list = list.slice(0, 20);
+  recentsMemory = list;
+  try { fs.writeFileSync(path.join(DATA, 'recents.json'), JSON.stringify(list)); } catch (e) {}
+}
+
 function getRecentsData(cb) {
   getRunningApps(function (runningList) {
     var dict = getAppDict();
-    var recentsHistory = readJSON(path.join(DATA, 'recents.json'), []);
+    var recentsHistory = getRecentsHistory();
     var runningMap = {};
     var IGNORE = {
       'com.gathin.tvhome': true,
@@ -259,8 +277,9 @@ function closeAppById(appId, cb) {
     }
 
     execFile('luna-send', ['-n', '1', 'luna://com.webos.applicationManager/closeByAppId', JSON.stringify({ id: appId })], function () {
-      var recents = readJSON(path.join(DATA, 'recents.json'), []);
+      var recents = getRecentsHistory();
       recents = recents.filter(function (x) { return x !== appId; });
+      recentsMemory = recents;
       try { fs.writeFileSync(path.join(DATA, 'recents.json'), JSON.stringify(recents)); } catch (e) {}
       runningCache = null;
       cb({ ok: true });
@@ -283,6 +302,7 @@ function closeAllUserApps(cb) {
         try { process.kill(parseInt(r.processid, 10), 'SIGTERM'); } catch (e) {}
       }
     });
+    recentsMemory = [];
     try { fs.writeFileSync(path.join(DATA, 'recents.json'), JSON.stringify([])); } catch (e) {}
     runningCache = null;
     cb({ ok: true });
@@ -440,3 +460,8 @@ http.createServer(function (req, res) {
   log('cannot start: ' + e.message);
   process.exit(1);
 }).listen(PORT, function () { writeWallJs(); log('listening on port ' + PORT); });
+
+module.exports = {
+  addRecentApp: addRecentApp,
+  getRecentsHistory: getRecentsHistory
+};
