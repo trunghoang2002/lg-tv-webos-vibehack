@@ -264,6 +264,10 @@
     pen.style.display = n ? 'flex' : 'none';
     pen.style.left = Math.min(1920 - 84, tileLeft(0) - 28 + (n - 1) * CELL_W + TILE_W + 56 + 16) + 'px';
     pen.style.top = (DOCK_TOP + TILE_H / 2 - 36) + 'px';
+
+    updateHeaderThreshold();
+    glass.style.width = glassW + 'px';
+    glass.style.height = glassH + 'px';
   }
 
   /** Index of the last tile in the dock row. */
@@ -383,6 +387,16 @@
 
   // ---- focus & glass -------------------------------------------------------------------------
 
+  var glassW = Math.round(TILE_W * FOCUS_SCALE + 2 * GLASS_PAD);
+  var glassH = Math.round(TILE_H * FOCUS_SCALE + 2 * GLASS_PAD);
+  var headerThreshold = 250;
+  var headerEl = null;
+
+  function updateHeaderThreshold() {
+    if (!headerEl) headerEl = document.querySelector('header');
+    if (headerEl) headerThreshold = headerEl.offsetTop + headerEl.offsetHeight + 24;
+  }
+
   function focusTile(i) {
     if (!items.length) return;
     i = Math.max(0, Math.min(i, items.length - 1));
@@ -399,29 +413,25 @@
       if (top - offset + TILE_H + 70 > VIEW_BOTTOM) offset = top + TILE_H + 70 - VIEW_BOTTOM;
       if (top - offset - 24 < VIEW_TOP) offset = top - 24 - VIEW_TOP;
     }
-    stage.style.transform = 'translateY(' + (-offset) + 'px)';
-    // Keep the header until the content (the dock band is topmost) would run into it.
-    var header = document.querySelector('header');
-    var headerBottom = header.offsetTop + header.offsetHeight;   // layout box: ignores the hide slide
-    document.body.classList.toggle('scrolled', DOCK_TOP - 28 - offset < headerBottom + 24);
+    stage.style.transform = 'translate3d(0,' + (-offset) + 'px,0)';
+    document.body.classList.toggle('scrolled', DOCK_TOP - 28 - offset < headerThreshold);
 
-    var w = TILE_W * FOCUS_SCALE + 2 * GLASS_PAD, h = TILE_H * FOCUS_SCALE + 2 * GLASS_PAD;
-    var x = tileLeft(i) + TILE_W / 2 - w / 2, y = top + TILE_H / 2 - h / 2;
-    glass.style.width = w + 'px';
-    glass.style.height = h + 'px';
-    glass.style.transform = 'translate(' + x + 'px,' + y + 'px)';
+    var x = tileLeft(i) + TILE_W / 2 - glassW / 2, y = top + TILE_H / 2 - glassH / 2;
+    glass.style.transform = 'translate3d(' + x + 'px,' + y + 'px,0)';
     if (!glassShown) {
-      // First show: jump there without the spring, then fade in.
+      glass.style.width = glassW + 'px';
+      glass.style.height = glassH + 'px';
       glass.style.transition = 'none';
-      glass.offsetWidth;   // flush the jump before restoring the transition
-      glass.style.transition = '';
-      glass.style.opacity = '1';
-      glassShown = true;
+      requestAnimationFrame(function () {
+        glass.style.transition = '';
+        glass.style.opacity = '1';
+        glassShown = true;
+      });
     }
 
     if (row === 0) showHero(items[i]);
     else hideHero();
-    setAmbient(items[i].color);   // the glow follows the focused tile in every row
+    setAmbient(items[i].color);
   }
 
   function hideGlass() {
@@ -439,17 +449,18 @@
       heroShown = true;
     } else if (hero.textContent !== label) {
       hero.style.opacity = '0';
-      hero.style.transform = 'translateX(-24px)';
+      hero.style.transform = 'translate3d(-24px,0,0)';
       clearTimeout(hero.swap);
       hero.swap = setTimeout(function () {
         hero.textContent = label;
         hero.style.transition = 'none';
-        hero.style.transform = 'translateX(24px)';
-        hero.offsetWidth;
-        hero.style.transition = '';
-        hero.style.transform = 'none';
-        hero.style.opacity = '1';
-      }, 120);
+        hero.style.transform = 'translate3d(24px,0,0)';
+        requestAnimationFrame(function () {
+          hero.style.transition = '';
+          hero.style.transform = 'translate3d(0,0,0)';
+          hero.style.opacity = '1';
+        });
+      }, 100);
     }
     setAmbient(item.color);
   }
@@ -460,18 +471,23 @@
     hero.style.opacity = '0';
   }
 
-  /** Crossfades the glow to a new colour by swapping between two layers. */
+  /** Crossfades the glow to a new colour by swapping between two layers, debounced for 60fps scrolling. */
+  var ambientTimer = null;
   function setAmbient(color) {
     if (!color) return;
     var key = color.join(',');
     if (key === ambientColor) return;
     ambientColor = key;
-    var back = ambients[1 - ambientFront];
-    back.style.background = 'radial-gradient(circle 1190px at 32% 42%, rgba(' + key + ',0.36) 0%, rgba(' +
-      key + ',0.15) 50%, rgba(' + key + ',0) 100%)';
-    back.style.opacity = '1';
-    ambients[ambientFront].style.opacity = '0';
-    ambientFront = 1 - ambientFront;
+    if (ambientTimer) clearTimeout(ambientTimer);
+    ambientTimer = setTimeout(function () {
+      ambientTimer = null;
+      var back = ambients[1 - ambientFront];
+      back.style.background = 'radial-gradient(circle 1190px at 32% 42%, rgba(' + key + ',0.36) 0%, rgba(' +
+        key + ',0.15) 50%, rgba(' + key + ',0) 100%)';
+      back.style.opacity = '1';
+      ambients[ambientFront].style.opacity = '0';
+      ambientFront = 1 - ambientFront;
+    }, 60);
   }
 
   function focusPill(i) {
@@ -798,12 +814,31 @@
     });
 
     if (recentsCards[recentFocusIndex] && recentFocusPart !== 'closeAll') {
-      recentsCards[recentFocusIndex].card.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      var wrap = $('recentsScrollWrap');
+      var cardEl = recentsCards[recentFocusIndex].card;
+      if (wrap && cardEl) {
+        var targetScroll = cardEl.offsetLeft - (wrap.clientWidth / 2) + (cardEl.offsetWidth / 2);
+        wrap.scrollLeft = Math.max(0, targetScroll);
+      }
     }
   }
 
   function renderRecents(items) {
-    recentsItems = items || [];
+    items = items || [];
+    var same = recentsItems && items && recentsItems.length === items.length;
+    if (same) {
+      for (var i = 0; i < items.length; i++) {
+        if (recentsItems[i].id !== items[i].id || recentsItems[i].running !== items[i].running) {
+          same = false;
+          break;
+        }
+      }
+    }
+    if (same && recentsCards.length === items.length) {
+      return;
+    }
+
+    recentsItems = items;
     recentsList.innerHTML = '';
     recentsCards = [];
 
@@ -887,11 +922,13 @@
     s.id = 'recentsScript';
     s.src = 'http://127.0.0.1:8090/api/recents?callback=window.__onRecents&t=' + Date.now();
     s.onerror = function () {
-      var fallback = [];
-      (window.TV_APPS && TV_APPS.apps || []).slice(0, 8).forEach(function (a) {
-        fallback.push({ id: a.id, title: a.title, icon: a.icon, running: false });
-      });
-      renderRecents(fallback);
+      if (!recentsCards.length) {
+        var fallback = [];
+        (window.TV_APPS && TV_APPS.apps || []).slice(0, 8).forEach(function (a) {
+          fallback.push({ id: a.id, title: a.title, icon: a.icon, running: false });
+        });
+        renderRecents(fallback);
+      }
     };
     document.body.appendChild(s);
   }
@@ -939,6 +976,14 @@
     hideCols();
     setZone('recents');
     recentsPanel.classList.remove('hidden');
+    // If not seeded yet, show cached apps immediately for 0ms lag
+    if (!recentsCards.length) {
+      var seed = [];
+      (window.TV_APPS && TV_APPS.apps || []).slice(0, 8).forEach(function (a) {
+        seed.push({ id: a.id, title: a.title, icon: a.icon, running: false });
+      });
+      renderRecents(seed);
+    }
     fetchRecents();
   }
 
@@ -1002,6 +1047,9 @@
 
   var LONG_PRESS_MS = 600;
   var okDown = false, okTimer = null;
+  var lastKeyTime = Date.now();
+  var lastNavTime = 0;
+  var NAV_THROTTLE_MS = 45;
 
   // On tiles OK acts on release, so a held OK can start rearranging instead of opening the app.
   document.addEventListener('keyup', function (e) {
@@ -1016,6 +1064,17 @@
 
   document.addEventListener('keydown', function (e) {
     var k = e.keyCode;
+    lastKeyTime = Date.now();
+    var isNav = k === KEY.LEFT || k === KEY.RIGHT || k === KEY.UP || k === KEY.DOWN;
+    if (isNav && (zone === 'grid' || zone === 'recents')) {
+      var now = Date.now();
+      if (now - lastNavTime < NAV_THROTTLE_MS) {
+        e.preventDefault();
+        return;
+      }
+      lastNavTime = now;
+    }
+
     if (k === KEY.OK && okDown) { e.preventDefault(); return; }   // key repeat while held
     if (k === KEY.OK) okDown = true;
     if (editing) {
@@ -1151,9 +1210,15 @@
   build();
   updateClock();
   setInterval(updateClock, 10000);
-  // Some firmware never fires webOSRelaunch or visibilitychange for this app, so returning to the
-  // launcher is not a reliable moment to look for new apps. Checking apps.js on a timer is.
-  setInterval(function () { refreshApps(function () { }); }, 20000);
+  // Check for app list updates in background when idle
+  setInterval(function () {
+    if (document.hidden) return;
+    if (Date.now() - lastKeyTime < 15000) return;
+    refreshApps(function () { });
+  }, 60000);
+  // Pre-seed recents in background so Back button opens instantaneously
+  setTimeout(fetchRecents, 1500);
+
   document.documentElement.lang = CONFIG.language === 'vi' ? 'vi' : 'en';
   pills[0].querySelector('span').textContent = L.inputs;
   pills[3].querySelector('span').textContent = L.settings;

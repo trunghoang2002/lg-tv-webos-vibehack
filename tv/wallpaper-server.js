@@ -136,7 +136,12 @@ function insideUsb(p) {
   } catch (e) { return ''; }
 }
 
+var dictCache = null;
+var dictCacheTime = 0;
+
 function getAppDict() {
+  var now = Date.now();
+  if (dictCache && (now - dictCacheTime < 30000)) return dictCache;
   var dict = {
     'com.webos.app.livetv': { id: 'com.webos.app.livetv', title: 'Live TV', icon: '', isInput: true },
     'com.webos.app.settings': { id: 'com.webos.app.settings', title: 'Settings', icon: '', isInput: false }
@@ -151,10 +156,19 @@ function getAppDict() {
       (data.inputs || []).forEach(function (inp) { dict[inp.appId] = { id: inp.appId, title: inp.label, icon: '', isInput: true }; });
     }
   } catch (e) { log('getAppDict err: ' + e.message); }
+  dictCache = dict;
+  dictCacheTime = now;
   return dict;
 }
 
+var runningCache = null;
+var runningCacheTime = 0;
+
 function getRunningApps(cb) {
+  var now = Date.now();
+  if (runningCache && (now - runningCacheTime < 2500)) {
+    return cb(runningCache);
+  }
   execFile('luna-send', ['-n', '1', 'luna://com.webos.applicationManager/running', '{}'], { timeout: 4000 }, function (err, out) {
     var running = [];
     if (!err && out) {
@@ -163,6 +177,8 @@ function getRunningApps(cb) {
         running = j.running || [];
       } catch (e) {}
     }
+    runningCache = running;
+    runningCacheTime = Date.now();
     cb(running);
   });
 }
@@ -227,6 +243,7 @@ function getRecentsData(cb) {
 }
 
 function closeAppById(appId, cb) {
+  runningCache = null;
   getRunningApps(function (runningList) {
     var pids = [];
     runningList.forEach(function (r) {
@@ -245,12 +262,14 @@ function closeAppById(appId, cb) {
       var recents = readJSON(path.join(DATA, 'recents.json'), []);
       recents = recents.filter(function (x) { return x !== appId; });
       try { fs.writeFileSync(path.join(DATA, 'recents.json'), JSON.stringify(recents)); } catch (e) {}
+      runningCache = null;
       cb({ ok: true });
     });
   });
 }
 
 function closeAllUserApps(cb) {
+  runningCache = null;
   getRunningApps(function (runningList) {
     var IGNORE = {
       'com.gathin.tvhome': true,
@@ -265,6 +284,7 @@ function closeAllUserApps(cb) {
       }
     });
     try { fs.writeFileSync(path.join(DATA, 'recents.json'), JSON.stringify([])); } catch (e) {}
+    runningCache = null;
     cb({ ok: true });
   });
 }
