@@ -290,34 +290,53 @@ function getRecentsData(cb) {
 
 function closeAppById(appId, cb) {
   runningCache = null;
-  // 1. Remove from official webOS recents
-  execFile('luna-send', ['-n', '1', 'luna://com.webos.service.recent/removeRecent', JSON.stringify({ appId: appId })], function () {
-    // 2. Terminate running process if any
-    getRunningApps(function (runningList) {
-      runningList.forEach(function (r) {
-        if (r.id === appId && r.processid) {
-          try { process.kill(parseInt(r.processid, 10), 'SIGTERM'); } catch (e) {}
-          try { process.kill(parseInt(r.processid, 10), 'SIGKILL'); } catch (e) {}
-        }
+  if (!appId || appId === 'com.gathin.tvhome') return cb({ ok: true });
+
+  // 1. Close surface in SurfaceManager
+  execFile('luna-send', ['-n', '1', 'luna://com.webos.surfacemanager/closeByAppId', JSON.stringify({ id: appId })], function () {
+    // 2. Remove from official webOS recents
+    execFile('luna-send', ['-n', '1', 'luna://com.webos.service.recent/removeRecent', JSON.stringify({ appId: appId })], function () {
+      // 3. Terminate running process if any
+      getRunningApps(function (runningList) {
+        runningList.forEach(function (r) {
+          if (r.id === appId) {
+            var pid = parseInt(r.webprocessid || r.processid, 10);
+            if (pid && pid > 0) {
+              try { process.kill(pid, 'SIGTERM'); } catch (e) {}
+              try { process.kill(pid, 'SIGKILL'); } catch (e) {}
+            }
+          }
+        });
+        // 4. Remove from session history
+        var recents = getRecentsHistory();
+        recents = recents.filter(function (x) { return x !== appId; });
+        recentsMemory = recents;
+        try { fs.writeFileSync(path.join(DATA, 'recents.json'), JSON.stringify(recents)); } catch (e) {}
+        runningCache = null;
+        cb({ ok: true });
       });
-      // 3. Remove from session history
-      var recents = getRecentsHistory();
-      recents = recents.filter(function (x) { return x !== appId; });
-      recentsMemory = recents;
-      try { fs.writeFileSync(path.join(DATA, 'recents.json'), JSON.stringify(recents)); } catch (e) {}
-      runningCache = null;
-      cb({ ok: true });
     });
   });
 }
 
 function closeAllUserApps(cb) {
   runningCache = null;
-  // 1. Call official webOS closeAllApps to terminate all background renderers cleanly
-  execFile('luna-send', ['-n', '1', 'luna://com.webos.applicationManager/closeAllApps', '{}'], function () {
-    // 2. Call official webOS removeAllRecents to clear the recent app history
+  getRunningApps(function (runningList) {
+    // 1. Close surfaces & processes of all running user apps EXCEPT our home launcher
+    runningList.forEach(function (r) {
+      if (r.id && r.id !== 'com.gathin.tvhome' && !isSystemOrInput(r.id)) {
+        execFile('luna-send', ['-n', '1', 'luna://com.webos.surfacemanager/closeByAppId', JSON.stringify({ id: r.id })], function () {});
+        var pid = parseInt(r.webprocessid || r.processid, 10);
+        if (pid && pid > 0) {
+          try { process.kill(pid, 'SIGTERM'); } catch (e) {}
+          try { process.kill(pid, 'SIGKILL'); } catch (e) {}
+        }
+      }
+    });
+
+    // 2. Clear official webOS recents list
     execFile('luna-send', ['-n', '1', 'luna://com.webos.service.recent/removeAllRecents', '{}'], function () {
-      // 3. Clear our local memory & file
+      // 3. Clear our local memory & recents.json
       recentsMemory = [];
       try { fs.writeFileSync(path.join(DATA, 'recents.json'), JSON.stringify([])); } catch (e) {}
       runningCache = null;
