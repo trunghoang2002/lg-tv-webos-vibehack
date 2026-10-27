@@ -136,10 +136,178 @@ function insideUsb(p) {
   } catch (e) { return ''; }
 }
 
+function getAppDict() {
+  var dict = {
+    'com.webos.app.livetv': { id: 'com.webos.app.livetv', title: 'Live TV', icon: '', isInput: true },
+    'com.webos.app.settings': { id: 'com.webos.app.settings', title: 'Settings', icon: '', isInput: false }
+  };
+  try {
+    var content = fs.readFileSync(path.join(APP_DIR, 'apps.js'), 'utf8');
+    var idx = content.indexOf('{');
+    if (idx !== -1) {
+      var jsonStr = content.slice(idx).replace(/;\s*$/, '');
+      var data = JSON.parse(jsonStr);
+      (data.apps || []).forEach(function (a) { dict[a.id] = a; });
+      (data.inputs || []).forEach(function (inp) { dict[inp.appId] = { id: inp.appId, title: inp.label, icon: '', isInput: true }; });
+    }
+  } catch (e) { log('getAppDict err: ' + e.message); }
+  return dict;
+}
+
+function getRunningApps(cb) {
+  execFile('luna-send', ['-n', '1', 'luna://com.webos.applicationManager/running', '{}'], { timeout: 4000 }, function (err, out) {
+    var running = [];
+    if (!err && out) {
+      try {
+        var j = JSON.parse(out.trim().split('\n').pop());
+        running = j.running || [];
+      } catch (e) {}
+    }
+    cb(running);
+  });
+}
+
+function getRecentsData(cb) {
+  getRunningApps(function (runningList) {
+    var dict = getAppDict();
+    var recentsHistory = readJSON(path.join(DATA, 'recents.json'), []);
+    var runningMap = {};
+    var IGNORE = {
+      'com.gathin.tvhome': true,
+      'com.webos.app.home': true,
+      'com.webos.app.screensaver': true,
+      'airplay': true
+    };
+
+    runningList.forEach(function (r) {
+      if (!IGNORE[r.id]) {
+        runningMap[r.id] = r;
+      }
+    });
+
+    var result = [];
+    var seen = {};
+    var order = [];
+
+    recentsHistory.forEach(function (id) {
+      if (runningMap[id]) {
+        order.push(id);
+        seen[id] = true;
+      }
+    });
+    for (var rId in runningMap) {
+      if (!seen[rId]) {
+        order.push(rId);
+        seen[rId] = true;
+      }
+    }
+
+    recentsHistory.forEach(function (id) {
+      if (!seen[id] && !IGNORE[id]) {
+        order.push(id);
+        seen[id] = true;
+      }
+    });
+
+    order.forEach(function (id) {
+      var app = dict[id] || { id: id, title: id, icon: '' };
+      var isRunning = !!runningMap[id];
+      result.push({
+        id: id,
+        title: app.title || id,
+        icon: app.icon || '',
+        iconColor: app.iconColor || '',
+        running: isRunning,
+        processId: isRunning ? runningMap[id].processid : ''
+      });
+    });
+
+    cb(result);
+  });
+}
+
+function closeAppById(appId, cb) {
+  getRunningApps(function (runningList) {
+    var pids = [];
+    runningList.forEach(function (r) {
+      if (r.id === appId && r.processid) {
+        pids.push(r.processid);
+      }
+    });
+
+    if (pids.length > 0) {
+      pids.forEach(function (pid) {
+        try { process.kill(parseInt(pid, 10), 'SIGTERM'); } catch (e) {}
+      });
+    }
+
+    execFile('luna-send', ['-n', '1', 'luna://com.webos.applicationManager/closeByAppId', JSON.stringify({ id: appId })], function () {
+      var recents = readJSON(path.join(DATA, 'recents.json'), []);
+      recents = recents.filter(function (x) { return x !== appId; });
+      try { fs.writeFileSync(path.join(DATA, 'recents.json'), JSON.stringify(recents)); } catch (e) {}
+      cb({ ok: true });
+    });
+  });
+}
+
+function closeAllUserApps(cb) {
+  getRunningApps(function (runningList) {
+    var IGNORE = {
+      'com.gathin.tvhome': true,
+      'com.webos.app.home': true,
+      'com.webos.app.screensaver': true,
+      'com.webos.app.livetv': true,
+      'airplay': true
+    };
+    runningList.forEach(function (r) {
+      if (!IGNORE[r.id] && r.processid) {
+        try { process.kill(parseInt(r.processid, 10), 'SIGTERM'); } catch (e) {}
+      }
+    });
+    try { fs.writeFileSync(path.join(DATA, 'recents.json'), JSON.stringify([])); } catch (e) {}
+    cb({ ok: true });
+  });
+}
+
 function handle(req, res) {
   var u = parseUrl(req.url, true), q = u.query, route = req.method + ' ' + u.pathname;
-  if (q.k !== KEY) {
+  var isLocal = req.connection.remoteAddress === '127.0.0.1' || req.connection.remoteAddress === '::1' || req.connection.remoteAddress === '::ffff:127.0.0.1';
+  var isRecentApi = u.pathname.indexOf('/api/recents') === 0 || u.pathname.indexOf('/api/close') === 0;
+
+  if (q.k !== KEY && !isLocal && !isRecentApi) {
     return send(res, 403, 'text/html; charset=utf-8', page403());
+  }
+
+  if (u.pathname === '/api/recents') {
+    return getRecentsData(function (data) {
+      if (q.callback) {
+        send(res, 200, 'application/javascript; charset=utf-8', q.callback + '(' + JSON.stringify(data) + ');');
+      } else {
+        json(res, 200, data, { 'Access-Control-Allow-Origin': '*' });
+      }
+    });
+  }
+
+  if (u.pathname === '/api/close') {
+    var targetId = String(q.id || '').trim();
+    if (!targetId) return json(res, 400, { error: 'missing id' });
+    return closeAppById(targetId, function (result) {
+      if (q.callback) {
+        send(res, 200, 'application/javascript; charset=utf-8', q.callback + '(' + JSON.stringify(result) + ');');
+      } else {
+        json(res, 200, result, { 'Access-Control-Allow-Origin': '*' });
+      }
+    });
+  }
+
+  if (u.pathname === '/api/closeAll') {
+    return closeAllUserApps(function (result) {
+      if (q.callback) {
+        send(res, 200, 'application/javascript; charset=utf-8', q.callback + '(' + JSON.stringify(result) + ');');
+      } else {
+        json(res, 200, result, { 'Access-Control-Allow-Origin': '*' });
+      }
+    });
   }
 
   if (route === 'GET /') {

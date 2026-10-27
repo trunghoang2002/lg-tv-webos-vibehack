@@ -469,3 +469,205 @@ body.arranging .item:nth-child(even):not(.moving):not(.focused) .card { animatio
   line-height: 1.45;
   opacity: 1;
 }
+
+/* ---- Recent Apps Drawer (Multitasking) ---- */
+#recentsPanel {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity 220ms ease;
+}
+#recentsPanel.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+#recentsBackdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(16px);
+}
+#recentsContainer {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 36px 64px 44px 64px;
+  background: linear-gradient(180deg, rgba(28, 28, 34, 0.96), rgba(16, 16, 20, 0.98));
+  border-top: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 36px 36px 0 0;
+  box-shadow: 0 -24px 60px rgba(0, 0, 0, 0.75);
+  transform: translateY(0);
+  transition: transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+#recentsPanel.hidden #recentsContainer {
+  transform: translateY(100%);
+}
+#recentsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+#recentsTitleGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+#recentsTitle {
+  font-size: 28px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: -0.01em;
+}
+#recentsHint {
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.5);
+}
+#recentsCloseAll {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease, transform 160ms ease;
+}
+#recentsCloseAll svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+#recentsCloseAll.focused {
+  background: rgba(255, 255, 255, 0.96);
+  color: #000;
+  transform: scale(1.06);
+}
+#recentsScrollWrap {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 16px 8px 24px 8px;
+  box-sizing: border-box;
+  scrollbar-width: none;
+}
+#recentsScrollWrap::-webkit-scrollbar {
+  display: none;
+}
+#recentsList {
+  display: flex;
+  flex-direction: row;
+  gap: 24px;
+  align-items: center;
+}
+.recentCard {
+  position: relative;
+  flex: 0 0 220px;
+  width: 220px;
+  height: 190px;
+  box-sizing: border-box;
+  padding: 20px 16px 16px 16px;
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.04));
+  border: 2px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 180ms ease, background 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+.recentCard.focused {
+  transform: scale(1.08) translateY(-4px);
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5), 0 0 24px rgba(255, 255, 255, 0.2);
+}
+.recentIcon {
+  width: 80px;
+  height: 80px;
+  border-radius: 20px;
+  object-fit: cover;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  background: #2c2c2e;
+}
+.recentIconWrap {
+  width: 80px;
+  height: 80px;
+  border-radius: 20px;
+  background: #2c2c2e;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.recentIconWrap svg {
+  width: 44px;
+  height: 44px;
+  fill: #fff;
+}
+.recentCardTitle {
+  margin-top: 14px;
+  font-size: 16px;
+  font-weight: 500;
+  color: #fff;
+  text-align: center;
+  width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.recentBadge {
+  margin-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  background: rgba(46, 204, 113, 0.18);
+  color: #2ecc71;
+  border: 1px solid rgba(46, 204, 113, 0.35);
+}
+.recentBadgeDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #2ecc71;
+  box-shadow: 0 0 6px #2ecc71;
+}
+.recentCloseBtn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 160ms ease, background 160ms ease, box-shadow 160ms ease;
+  z-index: 5;
+}
+.recentCloseBtn svg {
+  width: 16px;
+  height: 16px;
+  fill: #fff;
+}
+.recentCloseBtn.focused {
+  background: #ff3b30;
+  transform: scale(1.22);
+  box-shadow: 0 0 16px rgba(255, 59, 48, 0.9);
+}
+#recentsEmpty {
+  padding: 40px 0;
+  text-align: center;
+  font-size: 20px;
+  color: rgba(255, 255, 255, 0.45);
+}

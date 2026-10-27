@@ -52,7 +52,12 @@
       arrangeHint: 'Click an app to pick it up, point where it should go, click again to drop it.',
       wallTitle: 'Change wallpaper',
       wallScan: 'Scan this code with your phone camera, then pick a photo.',
-      wallOff: 'The wallpaper page is not running. Reboot the TV and try again.'
+      wallOff: 'The wallpaper page is not running. Reboot the TV and try again.',
+      recentsTitle: 'Recent Apps',
+      recentsHint: 'Arrows to select  ·  OK to open  ·  ▲ to close  ·  Back to exit',
+      recentsCloseAll: 'Close all',
+      recentsRunning: 'Running',
+      noRecents: 'No recent apps'
     },
     vi: {
       greetings: [[5, 'Chúc ngủ ngon'], [11, 'Chào buổi sáng'], [13, 'Chào buổi trưa'], [18, 'Chào buổi chiều'], [22, 'Chào buổi tối'], [24, 'Chúc ngủ ngon']],
@@ -67,7 +72,12 @@
       arrangeHint: 'Bấm vào app để nhấc lên, trỏ tới chỗ mới rồi bấm lần nữa để đặt.',
       wallTitle: 'Đổi hình nền',
       wallScan: 'Quét mã này bằng camera điện thoại rồi chọn ảnh.',
-      wallOff: 'Trang đổi hình nền chưa chạy. Khởi động lại TV rồi thử lại.'
+      wallOff: 'Trang đổi hình nền chưa chạy. Khởi động lại TV rồi thử lại.',
+      recentsTitle: 'Ứng dụng gần đây',
+      recentsHint: 'Mũi tên để chọn  ·  OK để mở  ·  ▲ để đóng  ·  Back để thoát',
+      recentsCloseAll: 'Đóng tất cả',
+      recentsRunning: 'Đang chạy',
+      noRecents: 'Không có ứng dụng nào gần đây'
     }
   };
   var L = LANG[CONFIG.language] || LANG.en;
@@ -480,6 +490,10 @@
       if (items[focused]) items[focused].el.classList.remove('focused');
       hideGlass();
     }
+    if (zone === 'recents' && z !== 'recents') {
+      var rp = $('recentsPanel');
+      if (rp) rp.classList.add('hidden');
+    }
     zone = z;
   }
 
@@ -748,6 +762,242 @@
     focusTile(focused);
   }
 
+  // ---- Recent Apps / Multitasking Drawer ------------------------------------------------------
+
+  var recentsPanel = $('recentsPanel');
+  var recentsList = $('recentsList');
+  var recentsEmpty = $('recentsEmpty');
+  var recentsCloseAll = $('recentsCloseAll');
+  var recentsItems = [];
+  var recentsCards = [];
+  var recentFocusIndex = 0;
+  var recentFocusPart = 'card'; // 'card' | 'close' | 'closeAll'
+
+  if ($('recentsTitle')) $('recentsTitle').textContent = L.recentsTitle;
+  if ($('recentsHint')) $('recentsHint').textContent = L.recentsHint;
+  if ($('recentsCloseAllLabel')) $('recentsCloseAllLabel').textContent = L.recentsCloseAll;
+  if ($('recentsEmpty')) $('recentsEmpty').textContent = L.noRecents;
+
+  if ($('recentsBackdrop')) $('recentsBackdrop').addEventListener('click', hideRecents);
+  if (recentsCloseAll) recentsCloseAll.addEventListener('click', closeAllRecents);
+
+  function setRecentsFocus(idx, part) {
+    if (idx < 0) idx = 0;
+    if (recentsItems.length && idx >= recentsItems.length) idx = recentsItems.length - 1;
+    recentFocusIndex = idx;
+    recentFocusPart = part || 'card';
+
+    recentsCloseAll.classList.toggle('focused', recentFocusPart === 'closeAll');
+
+    recentsCards.forEach(function (c, i) {
+      var isCurr = i === recentFocusIndex && recentFocusPart !== 'closeAll';
+      c.card.classList.toggle('focused', isCurr && recentFocusPart === 'card');
+      if (c.closeBtn) {
+        c.closeBtn.classList.toggle('focused', isCurr && recentFocusPart === 'close');
+      }
+    });
+
+    if (recentsCards[recentFocusIndex] && recentFocusPart !== 'closeAll') {
+      recentsCards[recentFocusIndex].card.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }
+  }
+
+  function renderRecents(items) {
+    recentsItems = items || [];
+    recentsList.innerHTML = '';
+    recentsCards = [];
+
+    if (!recentsItems.length) {
+      recentsEmpty.classList.remove('hidden');
+      recentsCloseAll.style.display = 'none';
+      return;
+    }
+
+    recentsEmpty.classList.add('hidden');
+    recentsCloseAll.style.display = 'flex';
+
+    recentsItems.forEach(function (app, idx) {
+      var card = document.createElement('div');
+      card.className = 'recentCard';
+
+      var closeBtn = document.createElement('div');
+      closeBtn.className = 'recentCloseBtn';
+      closeBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M19,6.41L17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12z"/></svg>';
+      closeBtn.title = 'Close app';
+      closeBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        closeRecent(app.id);
+      });
+      card.appendChild(closeBtn);
+
+      if (app.icon) {
+        var img = document.createElement('img');
+        img.className = 'recentIcon';
+        img.src = app.icon;
+        img.onerror = function () {
+          this.style.display = 'none';
+          var wrap = document.createElement('div');
+          wrap.className = 'recentIconWrap';
+          var p = app.id.indexOf('livetv') !== -1 ? ICON_LIVETV : ICON_INPUT;
+          wrap.innerHTML = '<svg viewBox="0 0 24 24"><path d="' + p + '"/></svg>';
+          card.insertBefore(wrap, card.children[1]);
+        };
+        card.appendChild(img);
+      } else {
+        var wrap = document.createElement('div');
+        wrap.className = 'recentIconWrap';
+        var p = app.id.indexOf('livetv') !== -1 ? ICON_LIVETV : ICON_INPUT;
+        wrap.innerHTML = '<svg viewBox="0 0 24 24"><path d="' + p + '"/></svg>';
+        card.appendChild(wrap);
+      }
+
+      var title = document.createElement('div');
+      title.className = 'recentCardTitle';
+      var titleText = (app.id === 'com.webos.app.livetv' ? (L.liveTv || 'Live TV') : (app.title || app.id));
+      title.textContent = titleText;
+      card.appendChild(title);
+
+      if (app.running) {
+        var badge = document.createElement('div');
+        badge.className = 'recentBadge';
+        badge.innerHTML = '<span class="recentBadgeDot"></span><span>' + L.recentsRunning + '</span>';
+        card.appendChild(badge);
+      }
+
+      card.addEventListener('click', function () {
+        hideRecents();
+        launch(app.id, app.title);
+      });
+
+      card.addEventListener('mouseover', function () {
+        setRecentsFocus(idx, 'card');
+      });
+
+      recentsList.appendChild(card);
+      recentsCards.push({ card: card, closeBtn: closeBtn, app: app });
+    });
+
+    setRecentsFocus(0, 'card');
+  }
+
+  function fetchRecents() {
+    var old = $('recentsScript');
+    if (old) old.parentNode.removeChild(old);
+    var s = document.createElement('script');
+    s.id = 'recentsScript';
+    s.src = 'http://127.0.0.1:8090/api/recents?callback=window.__onRecents&t=' + Date.now();
+    s.onerror = function () {
+      var fallback = [];
+      (window.TV_APPS && TV_APPS.apps || []).slice(0, 8).forEach(function (a) {
+        fallback.push({ id: a.id, title: a.title, icon: a.icon, running: false });
+      });
+      renderRecents(fallback);
+    };
+    document.body.appendChild(s);
+  }
+
+  window.__onRecents = function (data) {
+    var old = $('recentsScript');
+    if (old) old.parentNode.removeChild(old);
+    renderRecents(data);
+  };
+
+  function closeRecent(appId) {
+    var old = $('recentsCloseScript');
+    if (old) old.parentNode.removeChild(old);
+    var s = document.createElement('script');
+    s.id = 'recentsCloseScript';
+    s.src = 'http://127.0.0.1:8090/api/close?id=' + encodeURIComponent(appId) + '&callback=window.__onAppClosed&t=' + Date.now();
+    document.body.appendChild(s);
+  }
+
+  window.__onAppClosed = function () {
+    var old = $('recentsCloseScript');
+    if (old) old.parentNode.removeChild(old);
+    fetchRecents();
+  };
+
+  function closeAllRecents() {
+    var old = $('recentsCloseAllScript');
+    if (old) old.parentNode.removeChild(old);
+    var s = document.createElement('script');
+    s.id = 'recentsCloseAllScript';
+    s.src = 'http://127.0.0.1:8090/api/closeAll?callback=window.__onAllClosed&t=' + Date.now();
+    document.body.appendChild(s);
+  }
+
+  window.__onAllClosed = function () {
+    var old = $('recentsCloseAllScript');
+    if (old) old.parentNode.removeChild(old);
+    fetchRecents();
+  };
+
+  function showRecents() {
+    if (editing || arranging) return;
+    hideInputs();
+    hideWall();
+    hideCols();
+    setZone('recents');
+    recentsPanel.classList.remove('hidden');
+    fetchRecents();
+  }
+
+  function hideRecents() {
+    recentsPanel.classList.add('hidden');
+    setZone('grid');
+    focusTile(focused);
+  }
+
+  function handleRecentsKey(k) {
+    if (k === KEY.BACK || k === KEY.ESC) {
+      hideRecents();
+      return;
+    }
+    if (!recentsItems || !recentsItems.length) {
+      if (k === KEY.OK) hideRecents();
+      return;
+    }
+
+    if (recentFocusPart === 'closeAll') {
+      if (k === KEY.LEFT || k === KEY.DOWN) {
+        setRecentsFocus(recentFocusIndex, 'card');
+      } else if (k === KEY.OK) {
+        closeAllRecents();
+      }
+      return;
+    }
+
+    if (k === KEY.LEFT) {
+      if (recentFocusIndex > 0) {
+        setRecentsFocus(recentFocusIndex - 1, 'card');
+      }
+    } else if (k === KEY.RIGHT) {
+      if (recentFocusIndex < recentsItems.length - 1) {
+        setRecentsFocus(recentFocusIndex + 1, 'card');
+      } else {
+        setRecentsFocus(recentFocusIndex, 'closeAll');
+      }
+    } else if (k === KEY.UP) {
+      if (recentFocusPart === 'card') {
+        setRecentsFocus(recentFocusIndex, 'close');
+      } else if (recentFocusPart === 'close') {
+        setRecentsFocus(recentFocusIndex, 'closeAll');
+      }
+    } else if (k === KEY.DOWN) {
+      if (recentFocusPart === 'close') {
+        setRecentsFocus(recentFocusIndex, 'card');
+      }
+    } else if (k === KEY.OK) {
+      if (recentFocusPart === 'close') {
+        closeRecent(recentsItems[recentFocusIndex].id);
+      } else {
+        var it = recentsItems[recentFocusIndex];
+        hideRecents();
+        launch(it.id, it.title);
+      }
+    }
+  }
+
   // ---- keys ----------------------------------------------------------------------------------
 
   var LONG_PRESS_MS = 600;
@@ -776,6 +1026,8 @@
       else if (k === KEY.OK) finishEdit(true);
       else if (k === KEY.BACK || k === KEY.ESC) finishEdit(false);
       else return;
+    } else if (zone === 'recents') {
+      handleRecentsKey(k);
     } else if (zone === 'inputs') {
       if (k === KEY.UP) focusInput(inputFocus - 1);
       else if (k === KEY.DOWN) focusInput(inputFocus + 1);
@@ -795,7 +1047,7 @@
       else if (k === KEY.UP) focusPill(pills.length - 1);
       else if (k === KEY.DOWN) focusTile(Math.min(lastDock() + COLUMNS, items.length - 1));
       else if (k === KEY.OK) showCols();
-      else if (k === KEY.BACK) { /* home screen: Back goes nowhere */ }
+      else if (k === KEY.BACK) showRecents();
       else return;
     } else if (zone === 'wall') {
       if (k === KEY.BACK || k === KEY.ESC || k === KEY.OK || k === KEY.LEFT || k === KEY.RIGHT ||
@@ -806,7 +1058,7 @@
       else if (k === KEY.RIGHT) focusPill(pillFocus + 1);
       else if (k === KEY.DOWN) focusTile(rowOf(focused) === 0 ? focused : 0);
       else if (k === KEY.OK) activatePill(pillFocus);
-      else if (k === KEY.BACK) { /* home screen: Back goes nowhere */ }
+      else if (k === KEY.BACK) showRecents();
       else return;
     } else {
       var col = focused % COLUMNS, last = items.length - 1;
@@ -824,7 +1076,7 @@
         if (rowOf(focused) < rowOf(last)) focusTile(Math.min(focused + COLUMNS, last));
       } else if (k === KEY.OK) {
         okTimer = setTimeout(function () { okTimer = null; startEdit(); }, LONG_PRESS_MS);
-      } else if (k === KEY.BACK) { /* home screen: Back goes nowhere */ }
+      } else if (k === KEY.BACK) showRecents();
       else return;
     }
     e.preventDefault();

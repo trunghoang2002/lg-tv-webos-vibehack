@@ -12,6 +12,8 @@
 'use strict';
 var spawn = require('child_process').spawn;
 var execFile = require('child_process').execFile;
+var fs = require('fs');
+var path = require('path');
 
 var LAUNCHER = 'com.gathin.tvhome';
 var HOME_IDS = ['com.webos.app.home'];
@@ -20,6 +22,17 @@ var BOOT_GRACE_MS = 90000;
 var READY_TIMEOUT_MS = 8000;    // no foreground app reported yet: subscribe again
 var hits = [];
 var readyAt = 0;
+
+function recordApp(id) {
+  if (!id || id === LAUNCHER || HOME_IDS.indexOf(id) !== -1 || id === 'com.webos.app.screensaver') return;
+  var file = '/home/root/lg-tv-vibehack/recents.json';
+  var list = [];
+  try { list = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) {}
+  list = list.filter(function (x) { return x !== id; });
+  list.unshift(id);
+  if (list.length > 20) list = list.slice(0, 20);
+  try { fs.writeFileSync(file, JSON.stringify(list)); } catch (e) {}
+}
 
 function log(msg) { console.log(new Date().toISOString() + ' ' + msg); }
 
@@ -56,6 +69,7 @@ function start() {
       var j;
       try { j = JSON.parse(l); } catch (e) { return; }
       if (!j.appId) return;
+      recordApp(j.appId);
       if (!readyAt) {
         readyAt = Date.now();
         clearTimeout(retry);
