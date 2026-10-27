@@ -18,13 +18,15 @@
 #   --dim 0-0.8             Darken the wallpaper so text stays readable (default: 0.35)
 #   --glow on|off           Coloured glow behind the focused app
 #   --no-home-button        Do not remap the remote's Home button
+#   --update                Fast update without reinstalling (preserves settings)
 #   --uninstall             Remove everything this script installed
 set -e
 
-REPO="hoangvya19/lg-tv-webos-vibehack"
-BRANCH="main"
+REPO="trunghoang2002/lg-tv-webos-vibehack"
+BRANCH="dev"
 RAW="https://raw.githubusercontent.com/$REPO/$BRANCH"
-IPK_URL="https://github.com/$REPO/releases/latest/download/lg-tv-vibehack.ipk"
+UPSTREAM_REPO="hoangvya19/lg-tv-webos-vibehack"
+IPK_URL="https://github.com/$UPSTREAM_REPO/releases/latest/download/lg-tv-vibehack.ipk"
 
 APP_ID="com.gathin.tvhome"
 APP_DIR="/media/developer/apps/usr/palm/applications/$APP_ID"
@@ -58,7 +60,7 @@ luna_wait() {
 
 # ---------------------------------------------------------------- options
 LANG_OPT=""; CLOCK=""; COLS=""; CITY=""; FAHR=""; NOWEATHER=""; WALL=""; NOWALL=""; DIM=""; GLOW=""
-HOME_BTN=1; UNINSTALL=""
+HOME_BTN=1; UNINSTALL=""; UPDATE_ONLY=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --lang) LANG_OPT="$2"; shift ;;
@@ -72,6 +74,7 @@ while [ $# -gt 0 ]; do
     --dim) DIM="$2"; shift ;;
     --glow) GLOW="$2"; shift ;;
     --no-home-button) HOME_BTN="" ;;
+    --update|--fast-update) UPDATE_ONLY=1 ;;
     --uninstall) UNINSTALL=1 ;;
     *) die "Unknown option: $1" ;;
   esac
@@ -100,6 +103,26 @@ if [ -n "$UNINSTALL" ]; then
   rm -f /tmp/lg-tv-vibehack.log
   rm -rf "$DATA"
   ok "Removed. Reboot the TV to get LG's Home button back: reboot"
+  exit 0
+fi
+
+# ---------------------------------------------------------------- fast update
+if [ -n "$UPDATE_ONLY" ]; then
+  say "Fast update: Updating scripts & launcher files from $BRANCH"
+  mkdir -p "$DATA/icons"
+  for f in sync.js homewatch.js wallpaper-server.js wallpaper.html golauncher.sh boot.sh; do
+    curl -fsSL "$RAW/tv/$f" -o "$DATA/$f" || die "Could not download $f"
+  done
+  chmod +x "$DATA"/*.sh "$DATA"/*.js
+  if [ -d "$APP_DIR" ]; then
+    for f in app.js style.css index.html; do
+      curl -fsSL "$RAW/app/$f" -o "$APP_DIR/$f" || warn "Could not update $f"
+    done
+  fi
+  pkill -f "$DATA/homewatch.js" 2>/dev/null || true
+  nohup setsid /usr/bin/node "$DATA/homewatch.js" >> /tmp/lg-tv-vibehack.log 2>&1 < /dev/null &
+  luna-send -n 1 luna://com.webos.applicationManager/launch "{\"id\":\"$APP_ID\",\"params\":{\"reload\":true}}" >/dev/null 2>&1 || true
+  ok "Update complete! Launcher reloaded with latest changes."
   exit 0
 fi
 
@@ -174,6 +197,12 @@ luna_wait luna://com.webos.appInstallService/dev/install \
   '{"id":"com.ares.defaultName","ipkUrl":"/tmp/lg-tv-vibehack.ipk","subscribe":true}' || die "Install failed (see message above)."
 rm -f /tmp/lg-tv-vibehack.ipk
 ok "Launcher installed"
+
+say "Updating launcher files with latest improvements from $BRANCH"
+for f in app.js style.css index.html; do
+  curl -fsSL "$RAW/app/$f" -o "$APP_DIR/$f" || warn "Could not update $f"
+done
+ok "Latest launcher files applied"
 
 # ---------------------------------------------------------------- app list, settings, wallpaper
 say "Reading your apps"
