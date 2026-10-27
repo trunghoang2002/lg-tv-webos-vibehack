@@ -6,7 +6,7 @@
 
 *LG TV-vibehack · webOS-vibehack · LG-vibehack: launcher thay thế màn hình Home đầy quảng cáo của LG.*
 
-[![Release](https://img.shields.io/github/v/release/hoangvya19/lg-tv-webos-vibehack?style=flat-square)](https://github.com/hoangvya19/lg-tv-webos-vibehack/releases)
+[![Release](https://img.shields.io/github/v/release/trunghoang2002/lg-tv-webos-vibehack?style=flat-square)](https://github.com/trunghoang2002/lg-tv-webos-vibehack/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 [![webOS](https://img.shields.io/badge/webOS-6%2B-a50034?style=flat-square)](#tv-đã-thử-nghiệm)
 [![Root](https://img.shields.io/badge/root-optional-555?style=flat-square)](#root-hay-không-root)
@@ -37,6 +37,9 @@
 
 - **Giao diện gọn kiểu tvOS:** hàng dock ghim app, lưới app, và một khung kính lướt mượt giữa các ô.
 - **Nút Home thật** (TV đã root): bấm Home trên remote là vào launcher, không qua Home của LG.
+- **Đa nhiệm ứng dụng gần đây (Recent Apps):** bấm phím **Back (Trở về)** trên remote để bật thanh đa nhiệm, chuyển nhanh qua lại giữa các ứng dụng đang chạy hoặc bấm "Đóng tất cả" để giải phóng RAM cho TV (giữ nguyên launcher).
+- **Cuộn mượt bằng Magic Remote (Con lăn & mép màn hình):** hỗ trợ cuộn danh sách app bằng con lăn chuột (wheel) hoặc tự động trượt khi rê con trỏ chuột sát mép trên/dưới màn hình (edge scrolling).
+- **Tối ưu hiệu năng 60fps:** animation tăng tốc phần cứng mượt mà trên nền tảng webOS, lướt mượt giữa các ô app.
 - **Đổi hình nền bằng điện thoại** (TV đã root): bấm nút hình ảnh, quét mã QR, chọn ảnh rồi cắt
   trong khung đúng tỉ lệ TV, có đánh dấu chỗ đồng hồ và hàng app sẽ nằm. Lấy ảnh từ USB cắm TV cũng được.
 - **Thời tiết** theo thành phố, miễn phí, không cần tài khoản ([Open-Meteo](https://open-meteo.com)).
@@ -114,16 +117,28 @@ ssh root@192.168.1.50
 Dán lệnh này rồi Enter:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hoangvya19/lg-tv-webos-vibehack/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/trunghoang2002/lg-tv-webos-vibehack/dev/install.sh | sh
 ```
 
 Hiện chữ **Done** thì gõ `reboot`. Xong. 🎉
 
 <details>
+<summary><b>Cập nhật nhanh launcher (không mất cài đặt, không cần reboot)</b></summary>
+
+Nếu bạn đã cài launcher trước đó và muốn cập nhật phiên bản mới nhất từ nhánh `dev`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/trunghoang2002/lg-tv-webos-vibehack/dev/install.sh | sh -s -- --update
+```
+
+Quá trình cập nhật chỉ mất 2–3 giây. Toàn bộ hình nền, thời tiết và vị trí icon của bạn đều được giữ nguyên trọn vẹn, launcher sẽ tự khởi động lại với code mới mà không cần reboot TV.
+</details>
+
+<details>
 <summary><b>Cài luôn hình nền, thời tiết và tiếng Việt trong 1 lệnh</b></summary>
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hoangvya19/lg-tv-webos-vibehack/main/install.sh | sh -s -- \
+curl -fsSL https://raw.githubusercontent.com/trunghoang2002/lg-tv-webos-vibehack/dev/install.sh | sh -s -- \
   --city "Ho Chi Minh City" --wallpaper https://example.com/anh-cua-ban.jpg --lang vi --clock24 on
 ```
 
@@ -143,7 +158,7 @@ cùng mạng với TV. (Windows: dùng [WSL](https://learn.microsoft.com/windows
 1. **Bật Developer Mode.** Tạo tài khoản miễn phí tại [webostv.developer.lge.com](https://webostv.developer.lge.com).
    Trên TV, cài app **Developer Mode** từ LG Content Store, đăng nhập, bật **Dev Mode Status**
    (TV sẽ khởi động lại), mở lại app và bật **Key Server**.
-2. **Tải project:** [Tải ZIP](https://github.com/hoangvya19/lg-tv-webos-vibehack/archive/refs/heads/main.zip) rồi giải nén.
+2. **Tải project:** [Tải ZIP](https://github.com/trunghoang2002/lg-tv-webos-vibehack/archive/refs/heads/dev.zip) rồi giải nén.
 3. **Chạy trình cài** trong cửa sổ lệnh, ở thư mục vừa giải nén:
    ```bash
    ./install-noroot.sh
@@ -190,11 +205,12 @@ từ 4 đến 10. Lựa chọn này lưu trên TV và được ưu tiên hơn `-
 **Dùng dòng lệnh:** chạy lại đúng lệnh cài, thêm tuỳ chọn mong muốn. Cài đặt cũ được giữ nguyên.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hoangvya19/lg-tv-webos-vibehack/main/install.sh | sh -s -- --city "Da Nang"
+curl -fsSL https://raw.githubusercontent.com/trunghoang2002/lg-tv-webos-vibehack/dev/install.sh | sh -s -- --city "Da Nang"
 ```
 
 | Tuỳ chọn | Tác dụng |
 |---|---|
+| `--update` / `--fast-update` | Cập nhật nhanh mã nguồn launcher, giữ nguyên cài đặt và hình nền, không cần reboot TV |
 | `--wallpaper URL` | Hình nền từ link trên mạng |
 | `--wallpaper /tmp/usb/sda/sda1/anh.jpg` | …hoặc từ USB cắm vào TV |
 | `--no-wallpaper` | Về nền đen |
@@ -207,6 +223,7 @@ curl -fsSL https://raw.githubusercontent.com/hoangvya19/lg-tv-webos-vibehack/mai
 | `--clock24 on` | Đồng hồ 24 giờ |
 | `--columns 6` | Số ô mỗi hàng, từ 3 đến 10 (cây bút trên TV được ưu tiên hơn) |
 | `--no-home-button` | Không đổi nút Home trên remote |
+| `--uninstall` | Gỡ bỏ hoàn toàn launcher khỏi TV |
 
 **Mẹo chọn hình nền:** dùng ảnh ngang (1920 × 1080). Để khuôn mặt ở 1/3 phía trên,
 vì hàng dock và lưới app sẽ che nửa dưới.
@@ -308,14 +325,14 @@ Bình thường với TV ít RAM: app nặng đẩy launcher ra khỏi bộ nh�
 TV đã root: icon tự mất sau lần khởi động lại (hoặc chạy `sync.js`). Không root: chạy lại trình cài.
 </details>
 
-Vẫn chưa được? [Tạo issue](https://github.com/hoangvya19/lg-tv-webos-vibehack/issues/new/choose)
+Vẫn chưa được? [Tạo issue](https://github.com/trunghoang2002/lg-tv-webos-vibehack/issues/new/choose)
 kèm model TV, ảnh chụp màn hình và log.
 
 ## Gỡ cài đặt
 
 **TV đã root:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hoangvya19/lg-tv-webos-vibehack/main/install.sh | sh -s -- --uninstall
+curl -fsSL https://raw.githubusercontent.com/trunghoang2002/lg-tv-webos-vibehack/dev/install.sh | sh -s -- --uninstall
 reboot
 ```
 
@@ -325,6 +342,7 @@ reboot
 
 | Model | webOS | Chế độ | Trạng thái |
 |---|---|---|---|
+| 55NANO76SQA | 7.6 (webOS 22) | Root | ✅ Đa nhiệm & cuộn chuột mượt |
 | 55NANO77TPA | 6 (firmware 03.51.15) | Root | ✅ |
 | OLED55C6XLA | 26 | Không root | ✅ |
 | 55UK6340PTF | 4.4 (firmware 05.50.70) | Root | ✅ từ bản v1.1.3 |

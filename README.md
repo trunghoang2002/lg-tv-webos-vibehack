@@ -6,7 +6,7 @@
 
 *LG TV-vibehack · webOS-vibehack · LG-vibehack: a webOS launcher that replaces LG's ad-filled home.*
 
-[![Release](https://img.shields.io/github/v/release/hoangvya19/lg-tv-webos-vibehack?style=flat-square)](https://github.com/hoangvya19/lg-tv-webos-vibehack/releases)
+[![Release](https://img.shields.io/github/v/release/trunghoang2002/lg-tv-webos-vibehack?style=flat-square)](https://github.com/trunghoang2002/lg-tv-webos-vibehack/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 [![webOS](https://img.shields.io/badge/webOS-6%2B-a50034?style=flat-square)](#tested-tvs)
 [![Root](https://img.shields.io/badge/root-optional-555?style=flat-square)](#root-or-no-root)
@@ -37,6 +37,9 @@
 
 - **Clean tvOS-style home:** a pinned dock, an app grid and one glass highlight that glides between tiles.
 - **Real Home button** (rooted TVs): the remote's Home key opens this launcher, not LG's home.
+- **Recent Apps multitasking drawer:** press the **Back** button on the remote to toggle the multitasking drawer, switch between running apps, or click "Close All" to free up RAM (keeps launcher active).
+- **Magic Remote smooth scrolling (Wheel & edge scrolling):** supports scrolling the app grid with the remote's scroll wheel or automatically by hovering near the top/bottom edges of the screen.
+- **Optimized 60fps performance:** GPU-accelerated transforms for ultra-smooth animations on webOS.
 - **Change the wallpaper from your phone** (rooted TVs): press the picture button, scan the QR code,
   pick a photo and crop it in a TV-shaped frame that shows where the clock and apps will sit.
   Photos on a USB stick in the TV work too.
@@ -116,16 +119,28 @@ ssh root@192.168.1.50
 Then paste this and press Enter:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hoangvya19/lg-tv-webos-vibehack/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/trunghoang2002/lg-tv-webos-vibehack/dev/install.sh | sh
 ```
 
 When it says **Done**, type `reboot`. That's it. 🎉
 
 <details>
+<summary><b>Fast in-place update (preserves settings, no reboot needed)</b></summary>
+
+If you already have the launcher installed and want to update to the latest code on the `dev` branch:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/trunghoang2002/lg-tv-webos-vibehack/dev/install.sh | sh -s -- --update
+```
+
+The update finishes in 2–3 seconds. All your custom wallpapers, weather city, and tile ordering are completely preserved without rebooting the TV.
+</details>
+
+<details>
 <summary><b>Same thing, with wallpaper, weather and Vietnamese in one go</b></summary>
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hoangvya19/lg-tv-webos-vibehack/main/install.sh | sh -s -- \
+curl -fsSL https://raw.githubusercontent.com/trunghoang2002/lg-tv-webos-vibehack/dev/install.sh | sh -s -- \
   --city "Hanoi" --wallpaper https://example.com/my-photo.jpg --lang vi --clock24 on
 ```
 
@@ -145,7 +160,7 @@ on the same network as the TV. (Windows: use [WSL](https://learn.microsoft.com/w
 1. **Turn on Developer Mode.** Create a free account at [webostv.developer.lge.com](https://webostv.developer.lge.com).
    On the TV, install **Developer Mode** from the LG Content Store, sign in, turn on **Dev Mode Status**
    (the TV restarts), open it again and turn on **Key Server**.
-2. **Download this project:** [Download ZIP](https://github.com/hoangvya19/lg-tv-webos-vibehack/archive/refs/heads/main.zip) and unzip it.
+2. **Download this project:** [Download ZIP](https://github.com/trunghoang2002/lg-tv-webos-vibehack/archive/refs/heads/dev.zip) and unzip it.
 3. **Run the installer** in a terminal inside the unzipped folder:
    ```bash
    ./install-noroot.sh
@@ -194,11 +209,12 @@ The QR code contains a private key, so other people on your Wi-Fi can't open the
 are kept between runs.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hoangvya19/lg-tv-webos-vibehack/main/install.sh | sh -s -- --city "London"
+curl -fsSL https://raw.githubusercontent.com/trunghoang2002/lg-tv-webos-vibehack/dev/install.sh | sh -s -- --city "London"
 ```
 
 | Option | What it does |
 |---|---|
+| `--update` / `--fast-update` | Fast update launcher code, preserves wallpaper & settings, no reboot needed |
 | `--wallpaper URL` | Background picture from a web link |
 | `--wallpaper /tmp/usb/sda/sda1/photo.jpg` | …or from a USB stick plugged into the TV |
 | `--no-wallpaper` | Back to plain black |
@@ -211,6 +227,7 @@ curl -fsSL https://raw.githubusercontent.com/hoangvya19/lg-tv-webos-vibehack/mai
 | `--clock24 on` | 24-hour clock |
 | `--columns 6` | Tiles per row, 3 to 10 (the pencil on the TV overrides it) |
 | `--no-home-button` | Leave the remote's Home button alone |
+| `--uninstall` | Completely remove the launcher from the TV |
 
 **Wallpaper tips:** a landscape photo works best (1920 × 1080). Keep faces in the upper third:
 the dock and the app grid cover the lower half.
@@ -312,14 +329,14 @@ Normal on TVs with less memory: big apps push the launcher out of memory, so it 
 Rooted: it disappears after the next reboot (or run `sync.js`). No root: run the installer again.
 </details>
 
-Still stuck? [Open an issue](https://github.com/hoangvya19/lg-tv-webos-vibehack/issues/new/choose)
+Still stuck? [Open an issue](https://github.com/trunghoang2002/lg-tv-webos-vibehack/issues/new/choose)
 with your TV model, a photo of the screen and the log.
 
 ## Uninstall
 
 **Rooted:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hoangvya19/lg-tv-webos-vibehack/main/install.sh | sh -s -- --uninstall
+curl -fsSL https://raw.githubusercontent.com/trunghoang2002/lg-tv-webos-vibehack/dev/install.sh | sh -s -- --uninstall
 reboot
 ```
 
@@ -329,6 +346,7 @@ reboot
 
 | Model | webOS | Mode | Status |
 |---|---|---|---|
+| 55NANO76SQA | 7.6 (webOS 22) | Root | ✅ Multitasking & smooth scrolling |
 | 55NANO77TPA | 6 (firmware 03.51.15) | Root | ✅ |
 | OLED55C6XLA | 26 | No root | ✅ |
 | 55UK6340PTF | 4.4 (firmware 05.50.70) | Root | ✅ since v1.1.3 |
